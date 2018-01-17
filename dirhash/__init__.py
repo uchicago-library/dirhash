@@ -10,6 +10,7 @@ __version__ = "0.0.1"
 import sys
 import argparse
 from os import scandir
+from os.path import realpath, isdir, isfile
 from hashlib import new
 
 
@@ -50,7 +51,7 @@ def get_parser():
     )
     parser.add_argument(
         "-a", "--algo", type=str, default='md5',
-        help="The algorithm to employ internally ingenerating the hash"
+        help="The algorithm to employ internally for generating the checksum"
     )
     parser.add_argument(
         "--no-symlinks", action='store_true',
@@ -83,30 +84,36 @@ def hash_dir(d, chunksize=1000000, algo='md5', resolve_symlinks=True):
     subdirs = []
     for x in scandir(d):
         if x.is_file():
-            files.append(x)
+            files.append(x.path)
         elif x.is_dir():
-            subdirs.append(x)
+            subdirs.append(x.path)
         elif x.is_symlink():
-            symlinks.append(x)
+            symlinks.append(x.path)
         else:
-            others.append(x)
+            others.append(x.path)
 
     if symlinks and resolve_symlinks:
-        # resolve symlinks, add to the proper arrays here
-        pass
+        for x in symlinks:
+            target = realpath(x)
+            if isdir(target):
+                subdirs.append(target)
+            elif isfile(target):
+                files.append(target)
+            else:
+                others.append(target)
 
     if len(others) > 0:
         raise NotImplementedError()
 
     file_hashes = [
-        checksum(x.path, chunksize=chunksize, algo=algo)
+        checksum(x, chunksize=chunksize, algo=algo)
         for x in files
     ]
     sorted_file_hashes = sorted(file_hashes, key=lambda x: x.hexdigest())
 
     # Recurse
     subdir_hashes = [
-        hash_dir(x.path, chunksize=chunksize, algo=algo, resolve_symlinks=resolve_symlinks)
+        hash_dir(x, chunksize=chunksize, algo=algo, resolve_symlinks=resolve_symlinks)
         for x in subdirs
     ]
     sorted_subdir_hashes = sorted(subdir_hashes, key=lambda x: x.hexdigest())
