@@ -10,8 +10,8 @@ __version__ = "0.0.1"
 import sys
 import argparse
 from os import scandir
-from os.path import realpath, isdir, isfile
 from hashlib import new
+from json import dump
 
 
 def checksum(fp, chunksize=1000000, algo='md5'):
@@ -57,10 +57,14 @@ def get_parser():
         "--no-symlinks", action='store_true',
         help="If present, treat symlinks as if they don't exist"
     )
+    parser.add_argument(
+        "--write-cache", type=str, default=None,
+        help="A filepath to write the cache to. Cache is not written if not provided"
+    )
     return parser
 
 
-def hash_dir(d, chunksize=1000000, algo='md5', resolve_symlinks=True):
+def hash_dir(d, chunksize=1000000, algo='md5', resolve_symlinks=True, cache={}):
     """
     Produce the 'hash' of a directory recursively.
 
@@ -74,54 +78,77 @@ def hash_dir(d, chunksize=1000000, algo='md5', resolve_symlinks=True):
     :param str algo: The hashing algorithm to use, fed to :func:`hashlib.new`
     :param bool resolve_symlinks: Whether or not to resolve symlinks. If False symlinks
         will be ignored completely, and not factor into the hash.
-    :returns: A :class:`_hashlib.HASH` object containing the hash of the directory
-    :rtype: :class:`_hashlib.HASH`
+    :param dict cache: A dictionary where the keys are filepaths and the values are
+        :class:`_hashlib.HASH` objects which are in the necessary state to produce
+        digests and hexdigests when called. If a path exists in the cache it
+        will not be rehashed when encountered.
+    :returns: A :class:`tuple`, the first element of which is a :class:`_hashlib.HASH` object
+        containing the hash of the directory. The second element of which is the cache
+        :class:`dict` - keys are filepaths and values are :class:`_hashlib.HASH` objects for all
+        subdirectories and files.
+    :rtype: :class:`tuple`
     """
     h = new(algo)
     files = []
-    symlinks = []
     others = []
     subdirs = []
     for x in scandir(d):
+        # scandir will return True to both
+        # DirEntry.is_symlink() and DirEntry.is_dir() if something
+        # is a symlink to a dir, same for files and .is_file().
+        #
+        # Note the division of the if here and the
+        # following if/elif/else block for this reason
+        if x.is_symlink() and resolve_symlinks is False:
+            continue
+
         if x.is_file():
             files.append(x.path)
         elif x.is_dir():
             subdirs.append(x.path)
-        elif x.is_symlink():
-            symlinks.append(x.path)
         else:
             others.append(x.path)
-
-    if symlinks and resolve_symlinks:
-        for x in symlinks:
-            target = realpath(x)
-            if isdir(target):
-                subdirs.append(target)
-            elif isfile(target):
-                files.append(target)
-            else:
-                others.append(target)
 
     if len(others) > 0:
         raise NotImplementedError()
 
-    file_hashes = [
-        checksum(x, chunksize=chunksize, algo=algo)
-        for x in files
-    ]
+    # Hash the files
+    file_hashes = []
+    for x in files:
+        if x in cache:
+            file_hashes.append(cache[x])
+        else:
+            fh = checksum(x, chunksize=chunksize, algo=algo)
+            file_hashes.append(fh)
+            cache[x] = fh
+    # Sort them by hexdigest so we reliably get the same order by content
     sorted_file_hashes = sorted(file_hashes, key=lambda x: x.hexdigest())
 
-    # Recurse
-    subdir_hashes = [
-        hash_dir(x, chunksize=chunksize, algo=algo, resolve_symlinks=resolve_symlinks)
-        for x in subdirs
-    ]
+    # Hash the subdirs (recursive)
+    subdir_hashes = []
+    for x in subdirs:
+        if x in cache:
+            subdir_hashes.append(cache[x])
+        else:
+            # Recurse
+            dh, cache = hash_dir(
+                x, chunksize=chunksize,
+                algo=algo, resolve_symlinks=resolve_symlinks,
+                cache=cache
+            )
+            subdir_hashes.append(dh)
+            cache[x] = dh
+    # Sort them by hexdigest so we reliably get the same order by content
     sorted_subdir_hashes = sorted(subdir_hashes, key=lambda x: x.hexdigest())
 
+    # Hash together all the subhashes
     for x in sorted_file_hashes + sorted_subdir_hashes:
         h.update(x.digest())
 
-    return h
+    # Final cache update
+    cache[d] = h
+
+    return h, cache
 
 
 def main(args):
@@ -132,13 +159,13 @@ def main(args):
     :returns: A :class:`_hashlib.HASH` object containing the hash of the directory
     :rtype: :class:`_hashlib.HASH`
     """
-    h = hash_dir(
+    h, cache = hash_dir(
         args.directory,
         chunksize=args.chunksize,
         algo=args.algo,
         resolve_symlinks=not args.no_symlinks
     )
-    return h
+    return h, cache
 
 
 def cli():
@@ -147,8 +174,12 @@ def cli():
     """
     parser = get_parser()
     args = parser.parse_args()
-    result = main(args)
-    sys.stdout.write("{}\n".format(result.hexdigest()))
+    r, cache = main(args)
+    if args.write_cache:
+        with open(args.write_cache, 'w') as f:
+            dump({x: cache[x].hexdigest() for x in cache}, f, indent=2)
+
+    sys.stdout.write("{}\n".format(r.hexdigest()))
     exit(0)
 
 
