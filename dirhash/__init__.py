@@ -11,7 +11,7 @@ import sys
 import argparse
 from os import scandir
 from hashlib import new
-from json import dump
+from json import dump, load, dumps
 
 
 def checksum(fp, chunksize=1000000, algo='md5'):
@@ -181,6 +181,33 @@ def cli():
 
     sys.stdout.write("{}\n".format(r.hexdigest()))
     exit(0)
+
+
+def getdupes():
+    """
+    Little utility for processing cache outputs in order
+    to pull out duplicates
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cachefile", type=str, help='The path to the cache file')
+    parser.add_argument("-o", "--outfile", type=str, help="Path to output the "
+                        "duplicate JSON file to, defaults to stdout", default="-")
+    args = parser.parse_args()
+
+    with open(args.cachefile) as f:
+        cache = load(f)
+
+    by_hash = {}
+    for x in cache:
+        if by_hash.get(cache[x]) is None:
+            by_hash[cache[x]] = []
+        by_hash[cache[x]].append(x)
+    dupes = {x: by_hash[x] for x in by_hash if len(by_hash[x]) > 1}
+    if args.outfile == "-":
+        sys.stdout.write(dumps(dupes, indent=2))
+    else:
+        with open(args.outfile, 'w') as f:
+            dump(dupes, f)
 
 
 if __name__ == '__main__':

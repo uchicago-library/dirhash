@@ -27,7 +27,8 @@ setup(
     test_suite='tests',
     entry_points={
         'console_scripts': [
-            'dirhash = dirhash:cli'
+            'dirhash = dirhash:cli',
+            'dirhashgetdupes = dirhash:getdupes'
         ]
     }
 )
