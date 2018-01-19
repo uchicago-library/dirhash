@@ -19,7 +19,8 @@ def checksum(fp, chunksize=1000000, algo='md5'):
     Produce a hashlib.hash object which contains the checksum of a file
 
     :param str fp: The filepath to the file to be hashed
-    :param int chunksize: The maximum amount of the file to read into RAM at once
+    :param int chunksize: The maximum amount of the file to read into RAM at once,
+        in bytes.
     :param str algo: The hashing algorithm to use, fed to :func:`hashlib.new`
     :returns: A :class:`_hashlib.HASH` object containing the hash of the file
     :rtype: :class:`_hashlib.HASH`
@@ -74,7 +75,8 @@ def hash_dir(d, chunksize=1000000, algo='md5', resolve_symlinks=True, cache={}):
     but all attributes of the files except their contents is ignored.
 
     :param str d: The path to the directory to hash
-    :param int chunksize: The maximum amount of any file to read into RAM at once
+    :param int chunksize: The maximum amount of any file to read into RAM at once,
+        in bytes
     :param str algo: The hashing algorithm to use, fed to :func:`hashlib.new`
     :param bool resolve_symlinks: Whether or not to resolve symlinks. If False symlinks
         will be ignored completely, and not factor into the hash.
