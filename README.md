@@ -7,6 +7,41 @@ Produce a checksum, similar to a hash, for directories.
 
 See the full documentation at https://dirhash.readthedocs.io
 
+## Quickstart
+
+```
+$ git clone https://github.com/uchicago-library/dirhash.git
+$ cd dirhash
+$ python3 -m venv venv
+$ source venv/bin/activate
+$ python setup.py install
+$ dirhash --help
+`
+```
+
+## CLI Syntax
+
+```
+$ dirhash --help
+usage: dirhash [-h] [-c CHUNKSIZE] [-a ALGO] [--no-symlinks]
+               [--write-cache WRITE_CACHE]
+               directory
+
+positional arguments:
+  directory             The path to the directory to hash
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c CHUNKSIZE, --chunksize CHUNKSIZE
+                        How many bytes (maximum) of a file to read into RAM at
+                        once
+  -a ALGO, --algo ALGO  The algorithm to employ internally for generating the
+                        checksum
+  --no-symlinks         If present, treat symlinks as if they don't exist
+  --write-cache WRITE_CACHE
+                        A filepath to write the cache to. Cache is not written
+                        if not provided
+```
 
 # Author
 Brian Balsamo <brian@brianbalsamo.com>
