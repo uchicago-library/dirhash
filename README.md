@@ -43,5 +43,8 @@ optional arguments:
                         if not provided
 ```
 
+# See Also
+[md5deep and hashdeep](http://md5deep.sourceforge.net)
+
 # Author
 Brian Balsamo <brian@brianbalsamo.com>
